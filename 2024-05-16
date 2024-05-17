@@ -1,0 +1,531 @@
+/* 점검문제 1번 */
+            /* 제품 테이블의 재고 컬럼에 CHECK 제약조건을 추가하시오. */
+            alter table 제품 add constraint check (재고 >=0);
+            
+            select *
+            from information_schema.table_constraints
+            where constraint_schema= '한빛무역'
+            and table_name = '제품';
+                    
+            
+            /* 점검문제 2번 */
+            /*제품 테이블에 재고금액 컬럼을 추가하시오. 이때 재고금액은 '단가*재고'가 자동 계산되어 저장되도록 합니다.*/
+            
+            alter table 제품 add 재고금액 varchar(10);
+			
+            update 제품
+            set 재고금액 = 단가 * 재고;
+            
+            
+            /* 점검문제 3번 */
+            /*제품 테이블에서 제품 레코드를 삭제하면 주문세부 테이블에 있는 관련 레코드도 함께 
+            삭제되도록 주문세부 테이블의 제품번호 컬럼에 외래키 제약조건과 옵션을 설정하시오*/
+            alter table 주문세부 add constraint foreign key (제품번호) references 제품(제품번호) on delete cascade;
+            
+            use 한빛무역;
+            
+            create or replace view view_사원
+            as
+            select 이름,
+					집전화 as 전화번호,
+                    입사일,
+                    주소
+                    from 사원;
+			
+            select *
+            from view_사원;
+            
+            create or replace view view_제품별주문수량합
+            as
+            select 제품명,
+					sum(주문수량) as 주문수량합
+			from 제품
+			inner join 주문세부
+            on 제품.제품번호 = 주문세부.제품번호
+            group by 제품명;
+            
+            select *
+            from view_제품별주문수량합;
+            
+            create or replace view view_사원_여
+            as
+            select 이름,
+					집전화 as 전화번호,
+                    입사일,
+                    주소,
+                    성별
+			from 사원
+            where 성별 = '여';
+            
+            select *
+            from view_사원_여;
+            
+            select *
+            from view_사원_여
+            where 전화번호 like '%88%';
+            
+            select *
+            from view_제품별주문수량합
+            where 주문수량합 >= 1200;
+            
+            select *
+            from information_schema.views
+            where table_name = 'view_사원';
+            
+            show create view view_사원;
+            
+            drop view view_사원;
+            
+            create or replace view view_사원_여
+            as
+            select 사원번호,
+					이름,
+                    집전화 as 전화번호,
+                    입사일,
+                    주소,
+                    성별
+			from 사원
+            where 성별 = '여';
+            
+            insert into view_사원_여(사원번호, 이름, 전화번호, 입사일, 주소, 성별)
+            values('E12', '황여름', '(02)-587-4989', '2023-02-10', '서울시 강남구 청담동 23-5', '여');
+            
+            select *
+            from view_사원_여
+            where 사원번호 = 'E12';
+            
+            select *
+            from 사원
+            where 사원번호 = 'E12';
+            
+            insert into view_제품별주문수량합
+            values('단짠 새우깡', 250);
+            
+            insert into view_사원_여(사원번호, 이름, 입사일, 주소, 성별)
+            values('E13', '강겨울', '2023-02-10', '서울시 성북구 장위동 123-7', '남');
+            
+            select *
+            from view_사원_여
+            where 사원번호 = 'E13';
+            
+            select *
+            from 사원
+            where 사원번호 = 'E13';
+            
+            create or replace view view_사원_여
+            as
+            select 사원번호,
+					이름,
+                    집전화 as 전화번호,
+                    입사일,
+                    주소,
+                    성별
+			from 사원
+            where 성별 = '여'
+            with check option;
+            
+            insert into view_사원_여(사원번호, 이름, 성별)
+            values('E14', '유봄', '남');
+            
+            update view_사원_여
+            set 성별 = '남'
+            where 이름 = '황여름';
+            
+            /* 예제9-11 */
+            
+            create table 날씨
+				(
+					년도 int,
+                    월 int,
+                    일 int,
+                    도시 varchar(20),
+                    기온 decimal(3,1),
+                    습도 int,
+                    primary key(년도, 월, 일, 도시),
+                    index 기온인덱스(기온),
+                    index 도시인덱스(도시)
+				);
+                    
+            
+            select * from 사원 where 부서번호 = 'A2';
+            
+            create index idx_사원 on 사원(부서번호);
+            
+            select * from 사원 where 부서번호 = 'A2';
+            
+            DELIMITER $$
+            create procedure proc_if()
+				begin
+					declare x int;
+                    declare y int default 5;
+                    set x = 10;
+                    
+                    if x > y then
+						select 'x는 y보다 큽니다.' as 결과;
+					else
+						select 'x는 y보다 작거나 같습니다.' as 결과;
+					end if;
+				end $$
+			DELIMITER ;
+            
+            call proc_if();
+            
+            delimiter $$
+            create procedure proc_case()
+				begin
+					declare x int default 10;
+                    declare y int;
+                    set y = 10 mod 2;
+                    
+                    case
+						when y = 0 then
+							select 'x는 짝수입니다.' as '결과';
+						else
+							select 'x는 홀수입니다.' as '결과';
+					end case;
+				end $$
+			delimiter ;
+            
+            call proc_case();
+            
+            delimiter $$
+            create procedure proc_while()
+				begin
+					declare x int default 0;
+                    declare y int default 0;
+                    
+                    while x < 10 do
+						set x = x+1;
+                        set y = y+x;
+					end while;
+                    select x, y;
+				end $$
+			delimiter ;
+            
+            call proc_while();
+            
+            /* 예제 10-4 */
+            delimiter $$
+            create procedure proc_loop()
+				begin
+					declare x int default 0;
+                    declare y int default 0;
+                    
+                    loop_sum:loop
+						set x = x + 1;
+                        set y = y + x;
+                        if x > 10 then
+							leave loop_sum;
+						end if;
+                        select x, y;
+					end loop;
+				end $$
+			delimiter ;
+            
+            call proc_loop();
+            
+			/* 예제 10-5 */
+			delimiter $$
+            create procedure proc_repeat()
+			begin
+				declare x int default 0;
+                declare y int default 0;
+                
+                repeat
+					set x = x + 1;
+                    set y = y + x;
+				until x >= 10 end repeat;
+                select x, y;
+			end $$
+            delimiter ;
+            
+            call proc_repeat();
+		
+			/* 예제 10-6 */
+        delimiter $$
+        create procedure proc_고객정보()
+        begin
+			select *
+            from 고객;
+            
+            select count(*) as 고객수
+            from 고객;
+		end $$
+        delimiter ;
+        
+        call proc_고객정보();
+        
+        /* 예제 10-7 xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx*/
+        delimiter $$
+		create procedure proc_도시고객정보
+		(
+			in city varchar(50)
+		)
+		begin
+		   
+			select *
+			from 고객
+			where 도시 = city;
+			
+			select count(*) as 고객수
+			from 고객
+			where 도시 = city;
+		end $$
+		delimiter ;
+
+        call proc_도시고객정보('부산광역시');
+        
+        /* 예제 10-8 xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx*/
+        delimiter $$
+        create procedure proc_주문년도시_고객정보
+			(
+				in order_year int,
+                in city varchar(50)
+			)
+		begin
+			select 고객.고객정보,
+					고객회사명,
+                    도시,
+                    count(*) as 주문건수
+				from 고객 join 주문
+                on 고객.고객번호 = 주문.고객번호
+                where year(주문일) = order_year
+                and 도시 = city
+                group by 고객.고객번호. 고객회사명;
+		end $$
+        delimiter ;
+        
+        call proc_주문년도시_고객정보(2021, '공주시');
+                    
+		/* 예제 10-9 xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx*/
+        delimiter $$
+        create procedure proc_고객회사명_마일리지추가
+			(
+				in company varchar(50),
+                in add_mileage int
+			)
+		begin
+			select 고객번호,
+					고객회사명,
+                    마일리지 as 변경전마일리지
+			from 고객
+            where 고객회사명 = company;
+            
+            update 고객
+            set 마일리지 = 마일리지 + add_mileage
+            where 고객회사명 = company;
+            
+            select 고객번호,
+					고객회사명,
+                    마일리지 as 변경후마일리지
+			from 고객
+            where 고객회사명 = company;
+		end $$
+        delimiter ;
+        
+        call proc_고객회사명_마일리지추가('진영무역', 1000);
+        
+        /* 예제 10-10 xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx*/
+        delimiter $$
+        create procedure proc_고객회사명_평균마일리지로변경
+			(
+				in company varchar(50)
+			)
+		begin
+			declare 평균마일리지 int;
+            declare 보유마일리지 int;
+            
+            select 고객회사명,
+					마일리지 as 변경전마일리지
+			from 고객
+            where 고객회사명 = company;
+            
+            set 평균마일리지 = (select avg(마일리지) from 고객);
+            set 보유마일리지 = (select 마일리지 from 고객 where 고객회사명 = company);
+            
+            if(보유마일리지 > 평균마일리지) then
+				update 고객
+                set 마일리지 = 마일리지 + 100
+                where 고객회사명 = company;
+			else
+				update 고객
+                set 마일리지 = 평균마일리지
+                where 고객회사명 = company;
+			end if;
+            
+            select 고객회사명,
+					마일리지 as 변경후마일리지
+			from 고객
+            where 고객회사명 = company;
+		end $$
+        delimiter ;
+        
+        call proc_고객회사명_평균마일리지로변경('굿모닝서울');
+        
+        /* 예제 10-11 xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx*/
+        delimiter $$
+        create procedure proc_고객등급
+			(
+				in company varchar(50),
+                out grade varchar(20)
+			)
+		begin
+			declare 보유마일리지 int;
+            
+            select 마일리지
+            into 보유마일리지
+            from 고객
+            where 고객회사명 = company;
+            
+            if 보유마일리지 > 1000000 then
+				set grade = '최우수고객회사';
+			elseif 보유마일리지 >= 50000 then
+				set grade = '우수고객회사';
+			else
+				set grade = '관심고객회사';
+			end if;
+		end $$
+        delimiter ;
+        
+        call proc_고객등급('그린로더스', @그린로더스등급);
+        call proc_고객등급('오뚜락', @오뚜락등급);
+        
+        select @그린로더스등급, @오뚜라등급;
+        
+        /* 예제 10-12 */
+        delimiter $$
+        create procedure proc_인상금액
+			(
+				in increase_rate int,
+                inout price int
+			)
+		begin
+			set price = price * (1 + increase_rate / 100);
+		end $$
+        delimiter ;
+		
+        set @금액 = 10000;
+        call proc_인상금액(10, @금액);
+        select @금액;
+        
+        call proc_인상금액(10, @금액);
+        select @금액;
+        
+        /* 예제 10-13 xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx*/
+        delimiter $$
+		create function func_금액(quantity int, price int)
+			returns int
+		begin
+			declare amount int;
+			set amount = quantity * price;
+			return amount;
+		end $$
+		delimiter ;
+
+		select func_금액(100, 4500);
+        
+        select *,
+				func_금액(주문수량, 단가) as 주문금액
+		from 주문세부;
+        /* 예제 10-14 */
+        create table 제품로그
+			(
+				로그번호 int auto_increment primary key,
+                처리 varchar(10),
+                내용 varchar(100),
+                처리일 timestamp default current_timestamp
+			);
+        
+        delimiter $$
+        create trigger trigger_제품추가로그
+        after insert on 제품
+        for each row
+        begin
+			insert into 제품로그(처리, 내용)
+            values('insert', concat('제품번호:', new.제품번호, '제품명:', new.제품명));
+		end $$
+        delimiter ;
+        
+        insert into 제품(제품번호, 제품명, 단가, 재고)
+        values(99, '레몬캔디', 2000, 10);
+        
+        select *
+        from 제품
+        where 제품번호 = 99;
+        
+        select *
+        from 제품로그;
+        
+        /* 예제 10-15 */
+        delimiter $$
+        create trigger trigger_제품변경로그
+        after update on 제품
+        for each row
+        begin
+			if(new.단가 <> old.단가) then
+				insert into 제품로그(처리, 내용)
+                values ('update', concat('제품번호:', old.제품번호,'단가:', old.단가, '->', new.단가));
+                end if;
+                
+            if(new.재고 <> old.재고) then
+				insert into 제품로그(처리, 내용)
+                values ('update', concat('제품번호:', old.제품번호,' 재고:', old.재고, '->', new.재고));
+                end if;
+			end $$
+            delimiter ;
+            
+		update 제품
+        set 단가 = 2500
+        where 제품번호 = 99;
+        
+        select *
+        from 제품로그;
+        
+        /* 예제 10-16 */
+        delimiter $$
+        create trigger trigger_제품삭제로그
+        after delete on 제품
+        for each row
+        begin
+			insert into 제품로그(처리, 내용)
+            values ('delete', concat('제품번호:', old.제품번호, '제품명:',old.제품명));
+		end $$
+		delimiter ;
+            
+		delete from 제품
+        where 제품번호 = 99;
+        
+        select * from 제품로그;
+        
+        /* 점검문제 1번 */
+        delimiter $$
+		create procedure proc_주문정보
+        (
+			in 제품명_부분 varchar(100)
+		)
+		begin
+			select
+				제품명,
+				sum(주문세부.주문수량) as 주문수량합,
+				sum(주문세부.주문수량 * 제품.단가) as 주문금액합
+			from 제품
+            inner join 주문세부
+            on 제품.제품번호 = 주문세부.제품번호
+			where 제품명 like concat('%', 제품명_부분, '%')
+			group by 제품명;
+		end $$
+		delimiter ;
+        
+        call proc_주문정보('캔디');
+        
+        
+        /* 점검문제 2번 */
+        delimiter $$
+        create function 연령구분(birth date)
+			returns date
+		begin
+			case when '나이' < 20 then '미성년'
+			between 20 and 30 then '청년층'
+            between 30 and 55 then '중년층'
+            between 55 and 70 then '장년층'
+		else '노년층'
