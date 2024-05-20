@@ -1,0 +1,81 @@
+package moviereservation;
+
+import java.sql.*;
+
+public class Movie {
+	private Connection conn;
+
+	public Movie() {
+		try {
+			Class.forName("com.mysql.cj.jdbc.Driver");
+			conn = DriverManager.getConnection(
+					"jdbc:mysql://localhost:3306/moviereservation?useUnicode=true&characterEncoding=utf8", "root",
+					"1234");
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
+	}
+
+	public void addMovie(String title, String genre) {
+		String sql = "INSERT INTO movies (title, genre, timestamp) VALUES (?, ?, ?)";
+		try (PreparedStatement pstmt = conn.prepareStatement(sql)) {
+			pstmt.setString(1, title);
+			pstmt.setString(2, genre);
+			pstmt.setLong(3, System.currentTimeMillis() / 1000);
+			pstmt.executeUpdate();
+		} catch (SQLException e) {
+			e.printStackTrace();
+		}
+	}
+
+	public boolean removeMovieByTimestamp(String timestamp) {
+
+		String selectSql = "SELECT id FROM movies WHERE timestamp = ?";
+		String deleteReservationsSql = "DELETE FROM reservations WHERE movie_id = ?";
+		String deleteMovieSql = "DELETE FROM movies WHERE timestamp = ?";
+
+		try (PreparedStatement selectPstmt = conn.prepareStatement(selectSql)) {
+			selectPstmt.setString(1, timestamp);
+			try (ResultSet rs = selectPstmt.executeQuery()) {
+				if (rs.next()) {
+					int movieId = rs.getInt("id");
+
+					try (PreparedStatement deleteReservationsPstmt = conn.prepareStatement(deleteReservationsSql)) {
+						deleteReservationsPstmt.setInt(1, movieId);
+						deleteReservationsPstmt.executeUpdate();
+					}
+
+					try (PreparedStatement deleteMoviePstmt = conn.prepareStatement(deleteMovieSql)) {
+						deleteMoviePstmt.setString(1, timestamp);
+						int affectedRows = deleteMoviePstmt.executeUpdate();
+						return affectedRows > 0;
+					}
+				} else {
+					System.out.println("해당 대푯값(timestamp)의 영화를 찾을 수 없습니다. 올바른 대푯값(timestamp)을 입력하세요.");
+					return false;
+				}
+			}
+		} catch (SQLException e) {
+			e.printStackTrace();
+			return false;
+		}
+	}
+
+	public void displayMovies() {
+		String sql = "SELECT * FROM movies";
+		try (Statement stmt = conn.createStatement(); ResultSet rs = stmt.executeQuery(sql)) {
+
+			if (!rs.isBeforeFirst()) {
+				System.out.println("등록된 영화가 없습니다.");
+			} else {
+				System.out.println("===== 영화 목록 =====");
+				while (rs.next()) {
+					System.out.println(rs.getInt("id") + ": " + rs.getString("title") + ", " + rs.getString("genre"));
+				}
+				System.out.println("====================");
+			}
+		} catch (SQLException e) {
+			e.printStackTrace();
+		}
+	}
+}

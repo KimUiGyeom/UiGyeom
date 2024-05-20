@@ -1,0 +1,76 @@
+package moviereservation;
+
+import java.util.Scanner;
+
+public class AdminMenu extends AbstractMenu {
+	private Movie movieManager;
+
+	public AdminMenu(Scanner scanner, Movie movieManager) {
+		super(scanner);
+		this.movieManager = movieManager;
+	}
+
+	@Override
+	public void displayMenu() {
+		System.out.println("1: 영화 등록하기");
+		System.out.println("2: 영화 목록보기");
+		System.out.println("3: 영화 삭제하기");
+		System.out.println("b: 메인 메뉴로 돌아가기");
+		System.out.print("메뉴를 선택하세요: ");
+		handleInput();
+	}
+
+	@Override
+	public void handleInput() {
+		String select = scanner.nextLine();
+
+		switch (select) {
+		case "1":
+			addMovie();
+			break;
+		case "2":
+			displayMovies();
+			break;
+		case "3":
+			removeMovie();
+			break;
+		case "b":
+			System.out.println("메인 메뉴로 돌아갑니다.");
+			break;
+		default:
+			System.out.println("잘못된 입력입니다. 다시 입력해주세요.");
+			displayMenu();
+			break;
+		}
+	}
+
+	private void addMovie() {
+		System.out.print("영화 제목을 입력하세요: ");
+		String title = scanner.nextLine();
+		System.out.print("장르를 입력하세요: ");
+		String genre = scanner.nextLine();
+
+		movieManager.addMovie(title, genre);
+		System.out.println("영화가 성공적으로 등록되었습니다.");
+		displayMenu();
+	}
+
+	private void displayMovies() {
+		System.out.println("등록된 영화 목록:");
+		movieManager.displayMovies();
+		displayMenu();
+	}
+
+	private void removeMovie() {
+		System.out.print("삭제할 영화의 대푯값(timestamp)을 입력하세요: ");
+		String timestamp = scanner.nextLine();
+
+		if (movieManager.removeMovieByTimestamp(timestamp)) {
+			System.out.println("영화가 성공적으로 삭제되었습니다.");
+		} else {
+			System.out.println("해당 대푯값(timestamp)의 영화를 찾을 수 없습니다. 올바른 대푯값(timestamp)을 입력하세요.");
+		}
+
+		displayMenu();
+	}
+}

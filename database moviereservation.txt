@@ -1,0 +1,25 @@
+create database moviereservation;
+
+create table movies
+	(
+		id int primary key auto_increment,
+		genre varchar(100) not null,
+		title varchar(100) not null,
+		timestamp bigint not null
+    );
+    
+    create table reservations
+		(
+        id varchar(100) primary key,
+        movie_id int,
+        foreign key (movie_id) references movies(id)
+        );
+        
+    create table members
+		(
+			id varchar(100) primary key,
+			pwd varchar(100) not null,
+			name varchar(100) not null,
+			email varchar(100) not null,
+			joinDate date not null
+		);

@@ -1,0 +1,61 @@
+package moviereservation;
+
+import java.sql.*;
+
+public class Reservation {
+	private Connection conn;
+
+	public Reservation() {
+		try {
+			Class.forName("com.mysql.cj.jdbc.Driver");
+			conn = DriverManager.getConnection(
+					"jdbc:mysql://localhost:3306/moviereservation?useUnicode=true&characterEncoding=utf8", "root",
+					"1234");
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
+	}
+
+	public boolean reserveMovieById(String reservationId, int movieId) {
+		String sql = "INSERT INTO reservations (id, movie_id) VALUES (?, ?)";
+		try (PreparedStatement pstmt = conn.prepareStatement(sql)) {
+			pstmt.setString(1, reservationId);
+			pstmt.setInt(2, movieId);
+			pstmt.executeUpdate();
+			return true;
+		} catch (SQLException e) {
+			e.printStackTrace();
+			return false;
+		}
+	}
+
+	public boolean cancelReservation(String reservationId) {
+		String sql = "DELETE FROM reservations WHERE id = ?";
+		try (PreparedStatement pstmt = conn.prepareStatement(sql)) {
+			pstmt.setString(1, reservationId);
+			int affectedRows = pstmt.executeUpdate();
+			return affectedRows > 0;
+		} catch (SQLException e) {
+			e.printStackTrace();
+			return false;
+		}
+	}
+
+	public void displayReservations() {
+		String sql = "SELECT * FROM reservations";
+		try (Statement stmt = conn.createStatement(); ResultSet rs = stmt.executeQuery(sql)) {
+
+			if (!rs.isBeforeFirst()) {
+				System.out.println("예매된 영화가 없습니다.");
+			} else {
+				System.out.println("===== 예약 목록 =====");
+				while (rs.next()) {
+					System.out.println("발급번호: " + rs.getString("id") + ", 영화 ID: " + rs.getInt("movie_id"));
+				}
+				System.out.println("====================");
+			}
+		} catch (SQLException e) {
+			e.printStackTrace();
+		}
+	}
+}

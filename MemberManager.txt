@@ -1,0 +1,102 @@
+package moviereservation;
+
+import java.sql.*;
+import java.util.ArrayList;
+import java.util.List;
+
+public class MemberManager {
+	private Connection conn;
+
+	public MemberManager() {
+		try {
+			Class.forName("com.mysql.cj.jdbc.Driver");
+			conn = DriverManager.getConnection(
+					"jdbc:mysql://localhost:3306/moviereservation?useUnicode=true&characterEncoding=utf8", "root",
+					"1234");
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
+	}
+
+	public boolean addMember(Member member) {
+		String sql = "INSERT INTO members (id, pwd, name, email, joinDate) VALUES (?, ?, ?, ?, now())";
+		try (PreparedStatement pstmt = conn.prepareStatement(sql)) {
+			pstmt.setString(1, member.getId());
+			pstmt.setString(2, member.getPwd());
+			pstmt.setString(3, member.getName());
+			pstmt.setString(4, member.getEmail());
+			pstmt.executeUpdate();
+			return true;
+		} catch (SQLException e) {
+			e.printStackTrace();
+			return false;
+		}
+	}
+
+	public Member getMemberById(String id) {
+		String sql = "SELECT * FROM members WHERE id = ?";
+		try (PreparedStatement pstmt = conn.prepareStatement(sql)) {
+			pstmt.setString(1, id);
+			try (ResultSet rs = pstmt.executeQuery()) {
+				if (rs.next()) {
+					Member member = new Member();
+					member.setId(rs.getString("id"));
+					member.setPwd(rs.getString("pwd"));
+					member.setName(rs.getString("name"));
+					member.setEmail(rs.getString("email"));
+					member.setJoinDate(rs.getDate("joinDate"));
+					return member;
+				}
+			}
+		} catch (SQLException e) {
+			e.printStackTrace();
+		}
+		return null;
+	}
+
+	public boolean updateMember(Member member) {
+		String sql = "UPDATE members SET pwd = ?, name = ?, email = ? WHERE id = ?";
+		try (PreparedStatement pstmt = conn.prepareStatement(sql)) {
+			pstmt.setString(1, member.getPwd());
+			pstmt.setString(2, member.getName());
+			pstmt.setString(3, member.getEmail());
+			pstmt.setString(4, member.getId());
+			int affectedRows = pstmt.executeUpdate();
+			return affectedRows > 0;
+		} catch (SQLException e) {
+			e.printStackTrace();
+			return false;
+		}
+	}
+
+	public boolean deleteMember(String id) {
+		String sql = "DELETE FROM members WHERE id = ?";
+		try (PreparedStatement pstmt = conn.prepareStatement(sql)) {
+			pstmt.setString(1, id);
+			int affectedRows = pstmt.executeUpdate();
+			return affectedRows > 0;
+		} catch (SQLException e) {
+			e.printStackTrace();
+			return false;
+		}
+	}
+
+	public List<Member> getAllMembers() {
+		List<Member> members = new ArrayList<>();
+		String sql = "SELECT * FROM members";
+		try (Statement stmt = conn.createStatement(); ResultSet rs = stmt.executeQuery(sql)) {
+			while (rs.next()) {
+				Member member = new Member();
+				member.setId(rs.getString("id"));
+				member.setPwd(rs.getString("pwd"));
+				member.setName(rs.getString("name"));
+				member.setEmail(rs.getString("email"));
+				member.setJoinDate(rs.getDate("joinDate"));
+				members.add(member);
+			}
+		} catch (SQLException e) {
+			e.printStackTrace();
+		}
+		return members;
+	}
+}
