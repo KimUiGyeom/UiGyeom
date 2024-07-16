@@ -1,0 +1,10 @@
+require 'rubygems'
+require 'rest_client'
+require 'cgi'
+ 
+url = 'http://openapi.tago.go.kr/openapi/service/TrainInfoService/getStrtpntAlocFndTrainInfo?serviceKey=(API 코드 번호)'
+headers = { :params => { CGI::escape('numOfRows') => '50', CGI::escape('depPlaceId') => 'NAT140840', CGI::escape('arrPlaceId') => 'NAT010032', CGI::escape('depPlandTime') => "#{Time.now.strftime('%Y%m%d')}", CGI::escape('trainGradeCode') => '09' } }
+response = RestClient::Request.execute :method => 'GET', :url => url , :headers => headers
+puts response
+[출처] Ruby on Rails : 공공 데이터(예시 : 코레일) API 연동하기|작성자 도라도라
+
