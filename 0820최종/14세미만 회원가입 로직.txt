@@ -1,0 +1,1 @@
+회원가입 약관동의(signupTerms.jsp) -> 연령선택(selectSignup.jsp) 14세 미만 회원가입 클릭 시 -> 보호자 휴대폰 인증(childConfirm.jsp) -> 인증 페이지(childCoolSMS.jsp) -> 14세 미만 회원가입 폼(childSignup.jsp) level이 user로 입력될 수 있게(hidden 처리) -> 회원가입 완료(finishSignup.jsp)
