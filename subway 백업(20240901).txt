@@ -1,0 +1,496 @@
+<%@ page language="java" contentType="text/html; charset=UTF-8" pageEncoding="UTF-8" isELIgnored="false" %>
+<%@ taglib prefix="c" uri="http://java.sun.com/jsp/jstl/core" %>
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>네이버 지도에 실시간 지하철 위치 표시</title>
+<!-- 네이버 지도 API 호출 -->
+<script type="text/javascript" src="https://oapi.map.naver.com/openapi/v3/maps.js?ncpClientId=8jkyz2i5z7"></script>
+<!-- CSS 스타일 설정 -->
+<style>
+    .container {
+        display: flex;
+        flex-direction: column;
+        align-items: flex-start;
+        margin: 0;
+        padding: 0;
+    }
+    #content {
+        display: flex;
+        width: 100%;
+    }
+    #map {
+        width: 75%; /* 지도 영역 넓이를 75%로 설정 */
+        height: 600px;
+    }
+    #lineList {
+        width: 25%; /* 호선 목록 넓이를 25%로 설정 */
+        padding: 20px;
+        box-sizing: border-box;
+    }
+    .custom-marker {
+        display: flex;
+        align-items: center;
+    }
+</style>
+</head>
+<body>
+    <jsp:include page="header.jsp" />
+    <div class="container">
+    <h1>네이버 지도에 실시간 지하철 위치 표시</h1>
+    <form id="stationForm">
+        <label for="stationSelect">기차역을 선택하세요: </label>
+        <select id="stationSelect" onchange="moveToStation()">
+            <option value="">--기차역을 선택하세요--</option>
+            <option value="37.555167,126.970833">서울역</option>
+            <option value="37.595583,127.08575">상봉역</option>
+            <option value="37.529706,126.964744">용산역</option>
+            <option value="37.580861,127.048389">청량리역</option>
+            <option value="37.4874685,127.1013245">수서역</option>
+            <option value="37.515278,126.907561">영등포역</option>
+            <option value="37.623056,127.061389">광운대역</option>
+            <option value="37.561194,127.037444">왕십리역</option>
+            <option value="37.541694,127.017278">옥수역</option>
+        </select>
+    </form>
+
+    <div id="content">
+        <div id="map"></div>
+
+        <div id="lineList">
+            <h2>지하철 호선 목록</h2>
+            <select id="lineSelect" onchange="getLineData()">
+                <option value="">--호선을 선택하세요--</option>
+            </select>
+        </div>
+    </div>
+
+    <script type="text/javascript">
+        var map;
+        var trainMarkers = {};
+        var apiKey = "694c586a4b6b696a353557574d4b4e"; 
+        var coordinateCache = {}; 
+        var distanceCache = {}; 
+        var currentLineName = ''; 
+        var updateInterval = 10000;
+        var currentMarkerIcon = '';
+
+		var lineColors = {
+		    "1001": "#0052A4", // 1호선
+		    "1002": "#00A84D", // 2호선
+		    "1003": "#EF7C1C", // 3호선
+		    "1004": "#00A4E3", // 4호선
+		    "1005": "#996CAC", // 5호선
+		    "1006": "#CD7C2F", // 6호선
+		    "1007": "#747F00", // 7호선
+		    "1008": "#EA545D", // 8호선
+		    "1009": "#BB8336", // 9호선
+		    "1061": "#0052A4", // 중앙선
+		    "1063": "#77C4A3", // 경의중앙선
+		    "1065": "#0090D2", // 공항철도
+		    "1067": "#178C72", // 경춘선
+		    "1075": "#FABE00", // 수인분당선
+		    "1077": "#D4003B", // 신분당선
+		    "1092": "#B7C450", // 우이신설선
+		    "1032": "#9A6292"  // GTX-A
+		};
+
+        var lineMarkers = {
+            "1호선": "../img/1호선.png",
+            "2호선": "../img/2호선.png",
+            "3호선": "../img/3호선.png",
+            "4호선": "../img/4호선.png",
+            "5호선": "../img/5호선.png",
+            "7호선": "../img/7호선.png",
+            "공항철도": "../img/공항철도.png",
+            "경의중앙선": "../img/경의중앙선.png",
+            "경춘선": "../img/경춘선.png",
+            "수인분당선": "../img/수인분당선.png",
+            "GTX-A": "../img/GTX-A.png",
+        };
+
+        var stationLineMapping = {
+            "서울역": ["1호선", "4호선", "공항철도", "경의중앙선"],
+            "상봉역": ["7호선", "경의중앙선", "경춘선"],
+            "용산역": ["1호선", "경의중앙선"],
+            "청량리역": ["1호선", "경의중앙선", "수인분당선", "경춘선"],
+            "수서역": ["3호선", "수인분당선", "GTX-A"],
+            "영등포역": ["1호선"],
+            "광운대역": ["1호선", "경춘선"],
+            "왕십리역": ["2호선", "5호선", "수인분당선", "경의중앙선"],
+            "옥수역": ["3호선", "경의중앙선"]
+        };
+
+        var infoWindow = new naver.maps.InfoWindow({
+            borderWidth: 1,
+            borderColor: '#333',
+            backgroundColor: '#fff',
+            disableAutoPan: true
+        });
+
+        function initMap() {
+            map = new naver.maps.Map('map', {
+                center: new naver.maps.LatLng(37.5666103, 126.9783882),
+                zoom: 12
+            });
+
+            loadStationCoordinates(function() {
+                loadStationDistances(function() {
+                });
+            });
+        }
+
+        function moveToStation() {
+            var stationSelect = document.getElementById("stationSelect");
+            var selectedValue = stationSelect.value;
+            var stationName = stationSelect.options[stationSelect.selectedIndex].text;
+
+            if (selectedValue) {
+                var coords = selectedValue.split(',');
+                var lat = parseFloat(coords[0]);
+                var lng = parseFloat(coords[1]);
+                var position = new naver.maps.LatLng(lat, lng);
+
+                map.setCenter(position);
+                map.setZoom(16);
+
+                updateLineList(stationName);
+            }
+        }
+
+        function updateLineList(stationName) {
+            var lineSelect = document.getElementById("lineSelect");
+            lineSelect.innerHTML = "<option value=''>--호선을 선택하세요--</option>";
+
+            if (stationLineMapping[stationName]) {
+                stationLineMapping[stationName].forEach(function(line) {
+                    var option = document.createElement("option");
+                    option.value = line;
+                    option.text = line;
+
+                    if (lineColors[line]) {
+                        option.style.color = lineColors[line];
+                    }
+
+                    lineSelect.appendChild(option);
+                });
+            }
+        }
+
+        function getLineData() {
+            var lineSelect = document.getElementById('lineSelect');
+            currentLineName = lineSelect.value;
+
+            if (currentLineName) {
+                clearPreviousMarkers();
+                currentMarkerIcon = lineMarkers[currentLineName];
+                if (!currentMarkerIcon) {
+                    console.error('Marker icon for selected line not found.');
+                    return;
+                }
+                
+                updateTrainData(); // 실시간 위치 및 도착 정보 동기화
+                map.setZoom(13);
+                setInterval(updateTrainData, updateInterval); // 일정 간격으로 갱신
+            }
+        }
+
+        function clearPreviousMarkers() {
+            for (var trainNumber in trainMarkers) {
+                if (trainMarkers.hasOwnProperty(trainNumber)) {
+                    trainMarkers[trainNumber].setMap(null);
+                }
+            }
+            trainMarkers = {};
+        }
+
+        function loadStationCoordinates(callback) {
+            console.log("Loading station coordinates...");
+            var apiUrl = 'http://openapi.seoul.go.kr:8088/' + apiKey + '/xml/subwayStationMaster/1/1000/'; 
+
+            var xhr = new XMLHttpRequest();
+            xhr.open('GET', apiUrl, true);
+            xhr.onreadystatechange = function() {
+                if (xhr.readyState == 4) {
+                    if (xhr.status == 200) {
+                        console.log("Station coordinates API response: ", xhr.responseText);
+                        var parser = new DOMParser();
+                        var xmlDoc = parser.parseFromString(xhr.responseText, "application/xml");
+                        var rows = xmlDoc.getElementsByTagName("row");
+                        for (var i = 0; i < rows.length; i++) {
+                            var row = rows[i];
+                            var stationName = row.getElementsByTagName("BLDN_NM")[0].textContent;
+                            var route = row.getElementsByTagName("ROUTE")[0].textContent;
+                            var lat = parseFloat(row.getElementsByTagName("LAT")[0].textContent);
+                            var lot = parseFloat(row.getElementsByTagName("LOT")[0].textContent);
+                            coordinateCache[stationName] = { lat: lat, lot: lot, route: route };
+                        }
+                        callback();
+                    } else {
+                        console.error('Station coordinates API error: ' + xhr.status);
+                    }
+                }
+            };
+            xhr.send();
+        }
+
+        function loadStationDistances(callback) {
+            console.log("Loading station distances...");
+            var apiUrl = 'http://openapi.seoul.go.kr:8088/' + apiKey + '/xml/StationDstncReqreTimeHm/1/1000/'; 
+
+            var xhr = new XMLHttpRequest();
+            xhr.open('GET', apiUrl, true);
+            xhr.onreadystatechange = function() {
+                if (xhr.readyState == 4) {
+                    if (xhr.status == 200) {
+                        console.log("Station distances API response: ", xhr.responseText);
+                        var parser = new DOMParser();
+                        var xmlDoc = parser.parseFromString(xhr.responseText, "application/xml");
+                        var rows = xmlDoc.getElementsByTagName("row");
+                        for (var i = 0; i < rows.length; i++) {
+                            var row = rows[i];
+                            var route = row.getElementsByTagName("SBWY_ROUT_LN")[0].textContent;
+                            var stationName = row.getElementsByTagName("SBWY_STNS_NM")[0].textContent;
+                            var distance = parseFloat(row.getElementsByTagName("DIST_KM")[0].textContent);
+                            var time = row.getElementsByTagName("HM")[0].textContent;
+                            if (!distanceCache[route]) {
+                                distanceCache[route] = {};
+                            }
+                            distanceCache[route][stationName] = {
+                                distance: distance,
+                                time: time
+                            };
+                        }
+                        callback();
+                    } else {
+                        console.error('Station distances API error: ' + xhr.status);
+                    }
+                }
+            };
+            xhr.send();
+        }
+
+        function updateTrainData() {
+            var encodedLineName = encodeURIComponent(currentLineName);
+            var positionApiUrl = 'http://swopenAPI.seoul.go.kr/api/subway/' + apiKey + '/xml/realtimePosition/0/100/' + encodedLineName;
+            var arrivalApiUrl = 'http://swopenAPI.seoul.go.kr/api/subway/' + apiKey + '/xml/realtimeStationArrival/1/1001/ALL';
+
+            // 두 API를 동시에 호출
+            Promise.all([
+                fetch(positionApiUrl).then(response => response.text()),
+                fetch(arrivalApiUrl).then(response => response.text())
+            ])
+            .then(([positionResponse, arrivalResponse]) => {
+                var positionXmlDoc = new DOMParser().parseFromString(positionResponse, "application/xml");
+                var arrivalXmlDoc = new DOMParser().parseFromString(arrivalResponse, "application/xml");
+
+                // 위치 정보와 도착 정보 동기화
+                displayTrainPositions(positionXmlDoc, arrivalXmlDoc);
+            })
+            .catch(error => {
+                console.error('Error fetching data:', error);
+            });
+        }
+
+		function displayTrainPositions(positionXml, arrivalXml) {
+		    var positionRows = positionXml.getElementsByTagName("row");
+		    var arrivalRows = arrivalXml.getElementsByTagName("row");
+
+		    for (var i = 0; i < positionRows.length; i++) {
+		        var positionRow = positionRows[i];
+		        var trainNumberElement = positionRow.getElementsByTagName("trainNo")[0];
+		        var stationNameElement = positionRow.getElementsByTagName("statnNm")[0];
+
+		        if (trainNumberElement && stationNameElement) {
+		            var trainNumber = trainNumberElement.textContent.trim();
+		            var stationName = stationNameElement.textContent.trim();
+
+		            console.log("Location API Station Name: ", stationName); 
+
+		            // 도착 정보를 역명과 열차 번호로 매칭
+		            var matchingArrivalInfo = null;
+		            for (var j = 0; j < arrivalRows.length; j++) {
+		                var arrivalRow = arrivalRows[j];
+		                var arrivalTrainNumberElement = arrivalRow.getElementsByTagName("btrainNo")[0];
+		                var arrivalStationNameElement = arrivalRow.getElementsByTagName("statnNm")[0];
+
+		                if (arrivalTrainNumberElement && arrivalStationNameElement) {
+		                    var arrivalTrainNumber = arrivalTrainNumberElement.textContent.trim();
+		                    var arrivalStationName = arrivalStationNameElement.textContent.trim();
+
+		                    if (trainNumber === arrivalTrainNumber && stationName === arrivalStationName) {
+		                        matchingArrivalInfo = arrivalRow;
+		                        break;
+		                    }
+		                }
+		            }
+
+		            if (matchingArrivalInfo) {
+		                console.log("Arrival Info API Station Name: ", matchingArrivalInfo.getElementsByTagName("statnNm")[0].textContent);
+		                // 마커 업데이트 로직 호출
+		                updateMarkerWithArrivalInfo(trainNumber, stationName, matchingArrivalInfo);
+		            } else {
+		                console.warn(`No matching arrival info found for train ${trainNumber} at ${stationName}`);
+		            }
+		        } else {
+		            console.error('Missing train number or station name in the API response');
+		        }
+		    }
+		}
+
+
+		function updateMarkerWithArrivalInfo(trainNumber, stationName, arrivalInfo) {
+		    getCoordinates(stationName, function(lat, lot, route) {
+		        if (lat && lot) {
+		            var marker;
+		            if (trainMarkers[trainNumber]) {
+		                marker = trainMarkers[trainNumber];
+		                var prevLatLng = marker.getPosition();
+		                var duration = calculateDuration(route, stationName);
+		                animateMarker(marker, prevLatLng.lat(), prevLatLng.lng(), lat, lot, duration);
+		            } else {
+		                // 마커가 존재하지 않는 경우 새로 생성
+		                marker = new naver.maps.Marker({
+		                    position: new naver.maps.LatLng(lat, lot),
+		                    map: map,
+		                    title: '열차 ' + trainNumber + ' - ' + stationName + ' (' + route + ')',
+		                    icon: {
+		                        url: currentMarkerIcon,
+		                        size: new naver.maps.Size(24, 40),
+		                        origin: new naver.maps.Point(0, 0),
+		                        anchor: new naver.maps.Point(12, 40)
+		                    }
+		                });
+
+		                trainMarkers[trainNumber] = marker;
+
+		                naver.maps.Event.addListener(marker, 'click', function(e) {
+		                    displayArrivalInfoForMarker(trainNumber, marker);
+		                });
+		            }
+
+		            // 도착 정보를 마커에 적용
+		            marker.arrivalInfo = {
+		                stationName: stationName,
+		                trainLineNm: arrivalInfo.getElementsByTagName("trainLineNm")[0]?.textContent || "정보 없음",
+		                barvlDt: arrivalInfo.getElementsByTagName("barvlDt")[0]?.textContent || "정보 없음",
+		                arvlCd: arrivalInfo.getElementsByTagName("arvlCd")[0]?.textContent || "정보 없음",
+		                subwayId: arrivalInfo.getElementsByTagName("subwayId")[0]?.textContent || "undefined"  // subwayId 추가
+		            };
+		        } else {
+		            console.warn('Coordinates not found for station: ' + stationName);
+		        }
+		    });
+		}
+		
+		function displayArrivalInfoForMarker(trainNumber, marker) {
+		    if (marker.arrivalInfo) {
+		        var info = marker.arrivalInfo;
+		        
+		        // subwayId를 사용하여 호선 색상을 가져옴
+		        var subwayId = info.subwayId; // 도착 정보에서 지하철호선ID를 가져옴
+		        var backgroundColor = lineColors[subwayId] || '#ffffff';  // 호선 ID에 따른 색상 또는 기본 흰색 설정
+		        
+		        // 디버깅을 위한 로그 출력
+		        console.log('Subway ID:', subwayId);
+		        console.log('Background Color:', backgroundColor);
+
+		        // 텍스트 색상을 흰색 또는 검은색으로 설정 (배경색에 따라 대비되는 색상 선택)
+		        var textColor = isDarkColor(backgroundColor) ? '#ffffff' : '#000000';
+
+		        var contentString = 
+		            '<div style="padding:10px; font-size:12px;">' +
+		                '<h4 style="margin:0; padding:10px; background-color:' + backgroundColor + '; color: ' + textColor + ';">지하철 번호: ' + trainNumber + '</h4>' +
+		                '<p style="margin:0;">현재 위치: ' + info.stationName + '</p>' +
+		                '<p style="margin:0;">노선(목적지역-다음역): ' + info.trainLineNm + '</p>' +
+		                '<p style="margin:0;">도착 예정 시간: ' + info.barvlDt + ' 초</p>' +
+		                '<p style="margin:0;">상태: ' + getArrivalStatus(info.arvlCd) + '</p>' +
+		            '</div>';
+
+		        infoWindow.setContent(contentString);
+		        infoWindow.open(map, marker);
+		    } else {
+		        console.warn('No arrival info available for marker:', marker);
+		    }
+		}
+
+		// 배경색이 어두운지 밝은지 판단하는 함수
+		function isDarkColor(color) {
+		    var r = parseInt(color.slice(1, 3), 16);
+		    var g = parseInt(color.slice(3, 5), 16);
+		    var b = parseInt(color.slice(5, 7), 16);
+		    var brightness = (r * 299 + g * 587 + b * 114) / 1000;
+		    return brightness < 128;
+		}
+		
+		function getArrivalStatus(arvlCd) {
+		    switch(arvlCd) {
+		        case '0': return '진입 중';
+		        case '1': return '도착';
+		        case '2': return '출발';
+		        case '3': return '전역 출발';
+		        case '4': return '전역 진입';
+		        case '5': return '전역 도착';
+		        case '99': return '운행 중';
+		        default: return '정보 없음';
+		    }
+		}
+
+        function getCoordinates(stationName, callback) {
+            if (coordinateCache[stationName]) {
+                var stationData = coordinateCache[stationName];
+                var lat = parseFloat(stationData.lat);
+                var lot = parseFloat(stationData.lot);
+
+                if (!isNaN(lat) && !isNaN(lot)) {
+                    callback(lat, lot, stationData.route);
+                } else {
+                    console.error('Invalid coordinates for station: ' + stationName);
+                    callback(null, null, null);
+                }
+            } else {
+                console.error('Station not found in cache: ' + stationName);
+                callback(null, null, null);
+            }
+        }
+
+        function calculateDuration(route, stationName) {
+            if (distanceCache[route] && distanceCache[route][stationName]) {
+                var timeString = distanceCache[route][stationName].time;
+                var timeParts = timeString.split(':');
+                var minutes = parseInt(timeParts[0]) * 60 + parseInt(timeParts[1]);
+                return minutes * 1000;
+            }
+            return 2000;
+        }
+
+        function animateMarker(marker, startLat, startLng, endLat, endLng, duration) {
+            var startTime = Date.now();
+            var startLatLng = new naver.maps.LatLng(startLat, startLng);
+            var endLatLng = new naver.maps.LatLng(endLat, endLng);
+
+            function moveMarker() {
+                var elapsedTime = Date.now() - startTime;
+                var progress = elapsedTime / duration;
+
+                if (progress < 1) {
+                    var currentLat = startLat + (endLat - startLat) * progress;
+                    var currentLng = startLng + (endLng - startLng) * progress;
+                    marker.setPosition(new naver.maps.LatLng(currentLat, currentLng));
+                    requestAnimationFrame(moveMarker);
+                } else {
+                    marker.setPosition(endLatLng);
+                }
+            }
+
+            moveMarker();
+        }
+
+        initMap();
+    </script>
+
+    </div>
+    <jsp:include page="footer.jsp" />
+</body>
+</html>
